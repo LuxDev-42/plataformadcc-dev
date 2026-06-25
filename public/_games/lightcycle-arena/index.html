@@ -359,10 +359,56 @@
     font-family: monospace;
     color: #cdeefb;
   }
+
+  /* ---- Tela cheia: controle sutil no canto + indicação do atalho "F" ---- */
+  #fullscreen-ctl {
+    position: fixed;
+    top: 12px; right: 14px;
+    z-index: 50;            /* acima dos menus (5) e da intro/contagem (6); abaixo do fade (100) */
+    display: flex; align-items: center; gap: 7px;
+    opacity: .4;            /* discreto por padrão; acende ao passar o mouse */
+    transition: opacity .15s ease;
+  }
+  #fullscreen-ctl:hover { opacity: 1; }
+  #fullscreen-ctl .fs-key { font-size: 11px; padding: 0 6px; pointer-events: none; }
+  #btn-fullscreen {
+    width: 38px; height: 38px;
+    padding: 0; gap: 0;
+    color: #7fb4c7;                          /* ícone em ciano apagado */
+    background: rgba(3, 6, 12, 0.35);
+    border: 1.5px solid rgba(25,224,255,.3);
+    box-shadow: none;
+  }
+  #btn-fullscreen:hover {
+    color: var(--cyan);
+    background: rgba(3, 6, 12, 0.55);
+    border-color: var(--cyan);
+    box-shadow: 0 0 16px rgba(25,224,255,.28);
+  }
+  #btn-fullscreen .btn-icon { width: 20px; height: 20px; }
+  /* alterna os ícones expandir/contrair conforme o estado de tela cheia */
+  #btn-fullscreen .icon-compress { display: none; }
+  #btn-fullscreen.is-fullscreen .icon-expand { display: none; }
+  #btn-fullscreen.is-fullscreen .icon-compress { display: inline; }
 </style>
 </head>
 <body>
   <canvas id="game"></canvas>
+
+  <!-- Tela cheia: badge do atalho "F" + botão discreto, sempre no canto da tela -->
+  <div id="fullscreen-ctl">
+    <kbd class="fs-key" aria-hidden="true">F</kbd>
+    <button id="btn-fullscreen" type="button" aria-label="Tela cheia" title="Tela cheia (F)">
+      <svg class="btn-icon icon-expand" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
+        <path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+      </svg>
+      <svg class="btn-icon icon-compress" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+        <path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>
+      </svg>
+    </button>
+  </div>
 
   <div id="hud">
     <div id="scoreboard"></div>
@@ -489,6 +535,43 @@
 
   <!-- Fade pra branco (fim do modo ARES) -->
   <div id="fade"></div>
+
+  <!-- Tela cheia: botão + atalho "F". Independente do main.js, fica self-contained no index. -->
+  <script>
+    (function () {
+      const btn = document.getElementById("btn-fullscreen");
+      const root = document.documentElement;
+
+      const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+
+      function toggleFullscreen() {
+        try {
+          const fn = fsElement()
+            ? (document.exitFullscreen || document.webkitExitFullscreen)
+            : (root.requestFullscreen || root.webkitRequestFullscreen);
+          if (!fn) return;
+          const p = fn.call(fsElement() ? document : root);   // requestFullscreen pode rejeitar (gesto/permissão)
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) {}
+      }
+
+      function syncIcon() {
+        const on = !!fsElement();
+        btn.classList.toggle("is-fullscreen", on);
+        btn.setAttribute("aria-label", on ? "Sair da tela cheia" : "Tela cheia");
+        btn.title = on ? "Sair da tela cheia (F)" : "Tela cheia (F)";
+      }
+
+      btn.addEventListener("click", toggleFullscreen);
+      document.addEventListener("fullscreenchange", syncIcon);
+      document.addEventListener("webkitfullscreenchange", syncIcon);
+      // "F" alterna tela cheia (não conflita com os controles do jogo: WASD/setas/P/M/Esc)
+      window.addEventListener("keydown", (e) => {
+        if (e.key && e.key.toLowerCase() === "f") { e.preventDefault(); toggleFullscreen(); }
+      });
+      syncIcon();
+    })();
+  </script>
 
   <script type="module" src="src/main.js"></script>
 </body>
