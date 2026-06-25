@@ -563,7 +563,8 @@ window.addEventListener("keydown", (event) => {
   audio.resume();   // tecla = gesto: destrava o contexto de áudio (sons de UI/jogo)
 
   if (key === "m") { audio.toggleMute(); return; }
-  if (key === "escape") {
+  if (key === "x" || key === "backspace") {   // voltar/menu (Esc fica reservado p/ sair da tela cheia)
+    event.preventDefault();
     if (state.phase === "menu") {
       if (isOpenSub()) { audio.uiBack(); backToOptions(); }
       else if (!optionsMenuEl.classList.contains("hidden")) { audio.uiBack(); backToMenu(); }
