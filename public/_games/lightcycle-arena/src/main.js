@@ -7,6 +7,7 @@ import {
 import { makePlayer, advance, updateParticles, spawnLayout } from "./logic.js";
 import { Renderer } from "./graphics.js";
 import { AudioEngine } from "./sound.js";
+import { MidiMusicPlayer } from "./midi-music.js";
 
 // ---- Canvas / renderer / áudio (SFX) ----
 const canvas = document.getElementById("game");
@@ -30,6 +31,8 @@ const swatch1El = document.getElementById("sw1");
 const swatch2El = document.getElementById("sw2");
 const cdot1El = document.getElementById("cdot1");   // bolinhas do ícone do botão "Cores"
 const cdot2El = document.getElementById("cdot2");
+const musicVolEl = document.getElementById("music-vol");
+const musicValEl = document.getElementById("music-val");
 const sfxVolEl = document.getElementById("sfx-vol");
 const sfxValEl = document.getElementById("sfx-val");
 const spValEl = document.getElementById("sp-val");
@@ -45,8 +48,13 @@ const countdownEl = document.getElementById("countdown");
 const countdownNumEl = document.getElementById("countdown-num");
 const fadeEl = document.getElementById("fade");
 
+// ---- Trilha sonora MIDI (sintetizada por osciladores — ver midi-music.js) ----
+const music = new MidiMusicPlayer(audio);
+function startMusic(danger) { music.start(danger); }
+function stopMusic() { music.stop(); }
+
 // ---- Preferências persistidas (localStorage) ----
-const LS_SFX = "lc.sfxVol", LS_SP = "lc.spCpus", LS_MP = "lc.mpCpus", LS_DIFF = "lc.diff";
+const LS_MUSIC = "lc.musicVol", LS_SFX = "lc.sfxVol", LS_SP = "lc.spCpus", LS_MP = "lc.mpCpus", LS_DIFF = "lc.diff";
 function loadVol(key, def) {
   try { const v = parseFloat(localStorage.getItem(key)); return Number.isFinite(v) ? clamp(v, 0, 1) : def; }
   catch (e) { return def; }
@@ -57,6 +65,12 @@ function loadInt(key, def, min, max) {
 }
 function save(key, v) { try { localStorage.setItem(key, String(v)); } catch (e) {} }
 
+function applyMusicVol(v) {             // volume da trilha MIDI (0..1)
+  music.setVolume(v);
+  musicVolEl.value = Math.round(v * 100);
+  musicValEl.textContent = Math.round(v * 100);
+  save(LS_MUSIC, v);
+}
 function applySfxVol(v) {
   audio.setMasterVolume(v);
   sfxVolEl.value = Math.round(v * 100);
@@ -291,6 +305,7 @@ function finishAresTerminal() {
   fitAresSub();
   audio.aresStinger();
   audio.setEnginesActive(true);  // motores voltam a soar junto com a tela do ARES
+  startMusic(true);              // trilha do ARES quando "ARES invadiu o sistema" aparece
 }
 function showAresIntro() {
   state.phase = "aresintro";
@@ -398,7 +413,7 @@ function buildNav() {
   navConfigs.set(menuEl, [navBtn("btn-cpu"), navBtn("btn-2p"), navBtn("btn-options")]);
   navConfigs.set(optionsMenuEl, [navBtn("btn-adversaries"), navBtn("btn-audio"), navBtn("btn-colors"), navBtn("btn-options-back")]);
   navConfigs.set(colorsMenuEl, [navSlider(hue1El, 8), navSlider(hue2El, 8), navBtn("btn-colors-back")]);
-  navConfigs.set(audioMenuEl, [navSlider(sfxVolEl, 5), navBtn("btn-audio-back")]);
+  navConfigs.set(audioMenuEl, [navSlider(musicVolEl, 5), navSlider(sfxVolEl, 5), navBtn("btn-audio-back")]);
   navConfigs.set(advMenuEl, [
     navStepper(spValEl.closest(".stepper"), () => setSpCpus(settings.spCpus - 1), () => setSpCpus(settings.spCpus + 1)),
     navStepper(mpValEl.closest(".stepper"), () => setMpCpus(settings.mpCpus - 1), () => setMpCpus(settings.mpCpus + 1)),
@@ -456,11 +471,12 @@ async function startMatch(mode) {
   audio.resume();                          // contexto de áudio precisa de um gesto (este clique)
   window.focus();
   if (state.ares) {
-    // jogo fica em silêncio durante o terminal: os motores ligam no finishAresTerminal
+    // jogo fica em silêncio durante o terminal: motores e trilha ligam no finishAresTerminal
     await loadAresTerminalLines();
     showAresIntro();
   } else {
     audio.setEnginesActive(true);
+    startMusic(false);
     beginCountdown(false);
   }
   requestAnimationFrame(frame);
@@ -480,6 +496,7 @@ function goMenu() {
   renderer.updateCamera(state, 0);
   renderer.render(state);
   showOnly(menuEl);
+  stopMusic();
   audio.setEnginesActive(false);
 }
 
@@ -568,7 +585,11 @@ window.addEventListener("keydown", (event) => {
     else if (key === "enter" || key === " " || key === "spacebar") { event.preventDefault(); activateNav(); }
     return;
   }
-  if (key === "p" && isPlayable()) { paused = !paused; return; }
+  if (key === "p" && isPlayable()) {
+    paused = !paused;
+    if (paused) music.pause(); else music.resume();   // pausa/retoma a trilha junto com o jogo
+    return;
+  }
 
   const binding = KEYMAP[key];
   if (!binding || !canSteer() || paused) return;
@@ -606,6 +627,7 @@ document.getElementById("diff-inc").addEventListener("click", () => setDifficult
 
 hue1El.addEventListener("input", refreshColorUI);
 hue2El.addEventListener("input", refreshColorUI);
+musicVolEl.addEventListener("input", () => applyMusicVol(+musicVolEl.value / 100));
 sfxVolEl.addEventListener("input", () => applySfxVol(+sfxVolEl.value / 100));
 sfxVolEl.addEventListener("change", () => { audio.resume(); audio.blip(); });
 
@@ -624,6 +646,7 @@ window.addEventListener("resize", () => { renderer.resize(); renderer.render(sta
 
 // ---- Init ----
 refreshColorUI();
+applyMusicVol(loadVol(LS_MUSIC, 0.6));
 applySfxVol(loadVol(LS_SFX, 0.6));
 setSpCpus(settings.spCpus);
 setMpCpus(settings.mpCpus);

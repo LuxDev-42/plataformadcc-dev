@@ -35,8 +35,11 @@ export const DIRS = {
 };
 export const OPPOSITE = { up: "down", down: "up", left: "right", right: "left" };
 
-// Sem trilha sonora nesta versão (PlataformaDCC): todo o áudio é sintetizado em
-// Web Audio (ver sound.js). O MusicPlayer e as constantes de música foram removidos.
+// Trilha sonora em MIDI, sintetizada por osciladores (ver midi-music.js). As faixas
+// vêm do manifesto — lista explícita, pois o servidor estático do Nuxt não lista
+// diretório. Os efeitos sonoros continuam 100% procedurais (ver sound.js).
+export const MIDI_DIR = "midi/";
+export const MIDI_MANIFEST = "midi/manifest.json";
 
 export function clamp(value, lo, hi) { return value < lo ? lo : (value > hi ? hi : value); }
 

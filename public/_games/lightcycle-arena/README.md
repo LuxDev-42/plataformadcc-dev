@@ -52,9 +52,10 @@ Também dá para jogar tudo com o **mouse** (clicar nos botões).
 ## Notas técnicas
 
 - **100% offline / self-contained**: não usa backend, CDN, cookies ou trackers. As
-  fontes (Orbitron/Rajdhani) são auto-hospedadas e todo o áudio (motores, explosões,
-  jingles e sons de menu) é **sintetizado em tempo real** via Web Audio API — não há
-  arquivos de música embutidos.
+  fontes (Orbitron/Rajdhani) são auto-hospedadas e **todo o áudio é sintetizado** via
+  Web Audio API — os efeitos (motores, explosões, jingles, menu) são procedurais e a
+  trilha vem de arquivos **MIDI** tocados por osciladores (sem arquivos de áudio).
+- A trilha MIDI fica em `midi/` (veja o `README.md` de lá pra adicionar faixas).
 - Roda em `<iframe sandbox>` (apenas `allow-scripts` + `allow-same-origin`). O áudio
   é destravado no primeiro clique/tecla (sem depender de autoplay).
 - Pensado para **teclado** → `compatibility: ['pc']`.
@@ -64,6 +65,7 @@ Também dá para jogar tudo com o **mouse** (clicar nos botões).
 ```
 lightcycle-arena/
 ├── index.html      ← entrypoint (o jogo)
-├── src/            ← módulos ES (lógica, IA, gráficos, áudio, config)
-└── fonts/          ← Orbitron + Rajdhani (.woff2) e a fonte do título
+├── src/            ← módulos ES (lógica, IA, gráficos, áudio, MIDI, config)
+├── fonts/          ← Orbitron + Rajdhani (.woff2) e a fonte do título
+└── midi/           ← trilha sonora em .mid + manifest.json
 ```

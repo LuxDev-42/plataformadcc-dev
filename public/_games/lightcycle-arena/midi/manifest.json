@@ -1,0 +1,10 @@
+{
+  "normal": [
+    "Action.mid",
+    "Adagio.mid",
+    "EndLine.mid"
+  ],
+  "danger": [
+    "AsAlive.mid"
+  ]
+}
