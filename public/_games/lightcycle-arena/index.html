@@ -360,11 +360,34 @@
     color: #cdeefb;
   }
 
-  /* ---- Tela cheia: controle sutil no canto + indicação do atalho "F" ---- */
-  #fullscreen-ctl {
+  /* ---- Cluster fixo no topo direito: pausa (mobile, em jogo) + tela cheia (sempre) ---- */
+  #topbar-controls {
     position: fixed;
     top: 12px; right: 14px;
     z-index: 50;            /* acima dos menus (5) e da intro/contagem (6); abaixo do fade (100) */
+    display: flex; align-items: center; gap: 10px;
+  }
+  /* Pausa + Menu: mesma condição dos controles de toque (o main.js adiciona .shown). */
+  #btn-pause, #btn-menu-mobile {
+    display: none;
+    width: 38px; height: 38px;
+    padding: 0; gap: 0;
+    color: var(--cyan);
+    background: rgba(3, 6, 12, 0.5);
+    border: 2px solid var(--cyan);
+    box-shadow: 0 0 14px rgba(25,224,255,.25);
+  }
+  #btn-pause.shown, #btn-menu-mobile.shown { display: inline-flex; }
+  #btn-pause:hover, #btn-pause:active,
+  #btn-menu-mobile:hover, #btn-menu-mobile:active { background: var(--cyan); color: var(--bg); box-shadow: 0 0 22px var(--cyan); }
+  #btn-pause .btn-icon, #btn-menu-mobile .btn-icon { width: 20px; height: 20px; }
+  /* alterna pausa/play conforme o estado */
+  #btn-pause .icon-play { display: none; }
+  #btn-pause.is-paused .icon-pause { display: none; }
+  #btn-pause.is-paused .icon-play { display: inline; }
+
+  /* ---- Tela cheia: controle sutil no canto + indicação do atalho "F" ---- */
+  #fullscreen-ctl {
     display: flex; align-items: center; gap: 7px;
     opacity: .4;            /* discreto por padrão; acende ao passar o mouse */
     transition: opacity .15s ease;
@@ -390,24 +413,65 @@
   #btn-fullscreen .icon-compress { display: none; }
   #btn-fullscreen.is-fullscreen .icon-expand { display: none; }
   #btn-fullscreen.is-fullscreen .icon-compress { display: inline; }
+
+  /* ---- Controles de toque (mobile): dobrar p/ esquerda/direita ---- */
+  /* Escondido por padrão; o main.js adiciona .shown só durante o jogo (e só em toque). */
+  #touch-controls {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 4;                         /* acima do HUD (2), abaixo dos overlays (5) */
+    display: none;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 18px;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+    pointer-events: none;               /* só os botões capturam toque */
+  }
+  #touch-controls.shown { display: flex; }
+  .touch-btn {
+    pointer-events: auto;
+    width: 84px; height: 84px;
+    padding: 0; gap: 0;
+    color: var(--cyan);
+    background: rgba(3, 6, 12, 0.4);
+    border: 2px solid rgba(25,224,255,.55);
+    border-radius: 50%;                 /* alvo de toque grande e redondo */
+    box-shadow: 0 0 18px rgba(25,224,255,.22);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    touch-action: manipulation;         /* remove o atraso de 300ms no toque */
+  }
+  .touch-btn:active { background: var(--cyan); color: var(--bg); box-shadow: 0 0 28px var(--cyan); }
+  .touch-btn .btn-icon { width: 42px; height: 42px; }
 </style>
 </head>
 <body>
   <canvas id="game"></canvas>
 
-  <!-- Tela cheia: badge do atalho "F" + botão discreto, sempre no canto da tela -->
-  <div id="fullscreen-ctl">
-    <kbd class="fs-key" aria-hidden="true">F</kbd>
-    <button id="btn-fullscreen" type="button" aria-label="Tela cheia" title="Tela cheia (F)">
-      <svg class="btn-icon icon-expand" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
-        <path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
-      </svg>
-      <svg class="btn-icon icon-compress" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
-        <path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>
-      </svg>
+  <!-- Cluster do topo direito: menu + pausa (só mobile, durante o jogo) e tela cheia (sempre) -->
+  <div id="topbar-controls">
+    <button id="btn-menu-mobile" type="button" aria-label="Voltar ao menu" title="Menu (X)">
+      <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>
     </button>
+    <button id="btn-pause" type="button" aria-label="Pausar" title="Pausar (P)">
+      <svg class="btn-icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14"/><path d="M15 5v14"/></svg>
+      <svg class="btn-icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"/></svg>
+    </button>
+    <!-- Tela cheia: badge do atalho "F" + botão discreto -->
+    <div id="fullscreen-ctl">
+      <kbd class="fs-key" aria-hidden="true">F</kbd>
+      <button id="btn-fullscreen" type="button" aria-label="Tela cheia" title="Tela cheia (F)">
+        <svg class="btn-icon icon-expand" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
+          <path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+        <svg class="btn-icon icon-compress" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+          <path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>
+        </svg>
+      </button>
+    </div>
   </div>
 
   <div id="hud">
@@ -415,6 +479,23 @@
   </div>
 
   <div id="hint"><kbd>P</kbd> pausa · <kbd>X</kbd> menu · <kbd>M</kbd> som</div>
+
+  <!-- Controles de toque (mobile): dobrar esquerda/direita, relativo ao rumo da moto.
+       Exibidos só em dispositivos de toque e durante o jogo (controlado pelo main.js). -->
+  <div id="touch-controls">
+    <button class="touch-btn" type="button" data-turn="left" aria-label="Dobrar à esquerda">
+      <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M10 7 L5 12 L10 17"/>
+        <path d="M5 12 H15 a4 4 0 0 1 4 4 V18"/>
+      </svg>
+    </button>
+    <button class="touch-btn" type="button" data-turn="right" aria-label="Dobrar à direita">
+      <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14 7 L19 12 L14 17"/>
+        <path d="M19 12 H9 a4 4 0 0 0 -4 4 V18"/>
+      </svg>
+    </button>
+  </div>
 
   <!-- Menu inicial -->
   <div id="menu" class="overlay">
@@ -570,6 +651,33 @@
         if (e.key && e.key.toLowerCase() === "f") { e.preventDefault(); toggleFullscreen(); }
       });
       syncIcon();
+    })();
+  </script>
+
+  <!-- Detecção de mobile/toque (não há método nativo no projeto) + controles de dobrar.
+       O main.js lê window.lcIsTouch p/ exibir os botões e expõe window.lcSteer p/ virar a moto. -->
+  <script>
+    (function () {
+      // Combina sniffing de UA com capacidades do dispositivo (toque grosso, sem mouse fino).
+      function isMobileDevice() {
+        const ua = navigator.userAgent || navigator.vendor || "";
+        const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Silk/i.test(ua);
+        const coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+        const touch = ("ontouchstart" in window) || (navigator.maxTouchPoints || 0) > 0;
+        const ipadOS = /Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1;   // iPadOS se passa por Mac
+        return uaMobile || ipadOS || (coarse && touch);
+      }
+
+      window.lcIsTouch = isMobileDevice();   // consumido pelo main.js
+      if (!window.lcIsTouch) return;         // desktop: sem controles de toque
+
+      const ctl = document.getElementById("touch-controls");
+      if (!ctl) return;
+      ctl.addEventListener("contextmenu", (e) => e.preventDefault());   // sem menu de contexto ao segurar
+      for (const btn of ctl.querySelectorAll(".touch-btn")) {
+        // "touch-action: manipulation" deixa o click responsivo no toque (sem atraso) e sem disparo duplo
+        btn.addEventListener("click", () => { if (window.lcSteer) window.lcSteer(btn.dataset.turn); });
+      }
     })();
   </script>
 

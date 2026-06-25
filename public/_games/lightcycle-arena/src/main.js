@@ -44,6 +44,10 @@ const aresTerminalLinesEl = document.getElementById("ares-terminal-lines");
 const countdownEl = document.getElementById("countdown");
 const countdownNumEl = document.getElementById("countdown-num");
 const fadeEl = document.getElementById("fade");
+const touchControlsEl = document.getElementById("touch-controls");
+const btnPauseEl = document.getElementById("btn-pause");
+const btnMenuMobileEl = document.getElementById("btn-menu-mobile");
+const IS_TOUCH = !!window.lcIsTouch;   // detecção feita no index.html (script inline, roda antes deste módulo)
 
 // ---- Preferências persistidas (localStorage) ----
 const LS_SFX = "lc.sfxVol", LS_SP = "lc.spCpus", LS_MP = "lc.mpCpus", LS_DIFF = "lc.diff";
@@ -152,6 +156,7 @@ let running = false;
 let paused = false;
 let lastTime = 0;
 let prevAlive = [];
+let touchControlsShown = null;   // memo p/ não reescrever o DOM dos controles de toque todo frame
 let aresTerminalLines = [];
 let aresTerminalActive = false;
 let aresTerminalIndex = 0;
@@ -376,6 +381,7 @@ function frame(timestamp) {
   }
   audio.update(state, paused, pans);
   renderer.render(state);
+  syncTouchControls();   // mantém os controles de toque visíveis só durante o jogo
   if (running) requestAnimationFrame(frame);
 }
 
@@ -433,6 +439,19 @@ function activateNav() {
   if (item && item.type === "button") item.run();
 }
 
+// Mostra os controles de toque só em mobile e quando dá pra dirigir (singleplayer
+// na contagem/jogo). O frame() chama isto continuamente; showOnly() cobre as saídas.
+function syncTouchControls() {
+  if (!IS_TOUCH) return;
+  const steerable = state.phase === "countdown" || state.phase === "playing" || state.phase === "dying";
+  const show = steerable && state.mode === "cpu";
+  if (show === touchControlsShown) return;
+  touchControlsShown = show;
+  if (touchControlsEl) touchControlsEl.classList.toggle("shown", show);   // dobrar esq/dir
+  if (btnPauseEl) btnPauseEl.classList.toggle("shown", show);             // pausa
+  if (btnMenuMobileEl) btnMenuMobileEl.classList.toggle("shown", show);   // voltar ao menu
+}
+
 // Mostra só o overlay `target` (ou nenhum) e ativa a navegação por teclado nele.
 function showOnly(target) {
   for (const el of NAV_OVERLAYS) el.classList.toggle("hidden", el !== target);
@@ -441,6 +460,7 @@ function showOnly(target) {
   navItems = target ? (navConfigs.get(target) || null) : null;
   navIndex = 0;
   if (navItems && navItems.length) navItems[0].el.classList.add("nav-focus");
+  syncTouchControls();   // some com os controles de toque ao abrir um menu/resultado
 }
 
 // ---- Fluxo ----
@@ -451,6 +471,7 @@ async function startMatch(mode) {
   showOnly(null);
   resetRound();
   paused = false;
+  syncPauseButton();                       // garante o ícone de pausa (não "play") ao começar
   running = true;
   lastTime = 0;
   audio.resume();                          // contexto de áudio precisa de um gesto (este clique)
@@ -541,6 +562,21 @@ const isOpenSub = () => !colorsMenuEl.classList.contains("hidden")
   || !audioMenuEl.classList.contains("hidden")
   || !advMenuEl.classList.contains("hidden");
 
+// Pausa (tecla P / botão): só durante o jogo. O ícone do botão reflete o estado.
+function syncPauseButton() { if (btnPauseEl) btnPauseEl.classList.toggle("is-paused", paused); }
+function togglePause() {
+  if (!isPlayable()) return;
+  paused = !paused;
+  syncPauseButton();
+}
+// Sair pro menu durante o jogo (tecla X/Backspace / botão de menu): ARES sai com fade.
+function exitToMenu() {
+  if (state.phase === "fade") return;     // já fazendo o fade — ignora
+  audio.uiBack();
+  if (state.ares) aresEnd();
+  else goMenu();
+}
+
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   audio.resume();   // tecla = gesto: destrava o contexto de áudio (sons de UI/jogo)
@@ -551,12 +587,8 @@ window.addEventListener("keydown", (event) => {
     if (state.phase === "menu") {
       if (isOpenSub()) { audio.uiBack(); backToOptions(); }
       else if (!optionsMenuEl.classList.contains("hidden")) { audio.uiBack(); backToMenu(); }
-    } else if (state.phase === "fade") {
-      // já fazendo o fade — ignora
-    } else if (state.ares) {
-      audio.uiBack(); aresEnd();   // ARES: sai com o mesmo fade pra branco
     } else {
-      audio.uiBack(); goMenu();
+      exitToMenu();
     }
     return;
   }
@@ -569,7 +601,7 @@ window.addEventListener("keydown", (event) => {
     else if (key === "enter" || key === " " || key === "spacebar") { event.preventDefault(); activateNav(); }
     return;
   }
-  if (key === "p" && isPlayable()) { paused = !paused; return; }
+  if (key === "p") { togglePause(); return; }
 
   const binding = KEYMAP[key];
   if (!binding || !canSteer() || paused) return;
@@ -580,6 +612,19 @@ window.addEventListener("keydown", (event) => {
   if (!player || !player.alive || player.isAI) return;
   if (dir !== OPPOSITE[player.dir]) player.nextDir = dir;
 }, { passive: false });
+
+// ---- Controle por toque (mobile): "dobrar" relativo ao rumo atual da moto ----
+// Mapas de rotação 90° a partir da direção atual (tela: y cresce p/ baixo).
+const TURN_LEFT  = { up: "left", left: "down", down: "right", right: "up" };   // anti-horário
+const TURN_RIGHT = { up: "right", right: "down", down: "left", left: "up" };   // horário
+// Exposto p/ os botões do index.html. Vira o P1 (único humano no singleplayer).
+window.lcSteer = function steerTurn(side) {
+  if (!canSteer() || paused) return;
+  const player = state.players && state.players[0];
+  if (!player || !player.alive || player.isAI) return;
+  const dir = (side === "left" ? TURN_LEFT : TURN_RIGHT)[player.dir];
+  if (dir && dir !== OPPOSITE[player.dir]) player.nextDir = dir;   // curva de 90° nunca é ré, mas guardamos
+};
 
 // ---- Botões ----
 document.getElementById("btn-cpu").addEventListener("click", () => {
@@ -597,6 +642,10 @@ document.getElementById("btn-audio").addEventListener("click", openAudio);
 document.getElementById("btn-audio-back").addEventListener("click", backToOptions);
 document.getElementById("btn-again").addEventListener("click", again);
 document.getElementById("btn-menu").addEventListener("click", goMenu);
+
+// Controles do topo (mobile): pausa e voltar ao menu — mesmos efeitos das teclas P e X
+if (btnPauseEl) btnPauseEl.addEventListener("click", togglePause);
+if (btnMenuMobileEl) btnMenuMobileEl.addEventListener("click", exitToMenu);
 
 document.getElementById("sp-dec").addEventListener("click", () => setSpCpus(settings.spCpus - 1));
 document.getElementById("sp-inc").addEventListener("click", () => setSpCpus(settings.spCpus + 1));
@@ -616,6 +665,8 @@ document.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
   audio.resume();
+  if (btn.classList.contains("touch-btn")) return;         // controle de jogo (dobrar) = sem som de UI
+  if (btn.id === "btn-menu-mobile") return;                // já toca uiBack no exitToMenu (evita som duplo)
   if (btn.classList.contains("step-btn")) audio.uiMove();   // −/+ dos steppers = ajuste
   else if (btn.id.endsWith("-back")) audio.uiBack();        // botões "Voltar" = som grave
   else audio.uiSelect();                                    // demais botões = selecionar
